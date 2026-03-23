@@ -26,30 +26,34 @@ The framework supports two clinical note styles:
 ## Project Structure
 
 ```
-ADR_detection/
+multi-agent-ADR-detection/
 ├── agents.py           # Six LLM agent definitions with style-aware prompts
 ├── pipeline.py         # Three-step pipeline runner (CLI)
 ├── utils.py            # Binary label conversion utility
 ├── requirements.txt    # Python dependencies
-├── .gitignore
+├── .env.example        # API key template (copy to .env)
 ├── dashboard/
 │   ├── app.py          # Streamlit interactive dashboard
-│   ├── .env.example    # API key template
+│   ├── .env.example    # API key template for dashboard
 │   ├── requirements.txt
 │   ├── note_sample.xlsx            # Sample input file
 │   ├── Multi-Agent_Framework.png   # Framework diagram
-│   ├── note_example.jpg            # Input format example
-│   └── output/                     # Pipeline results (generated at runtime)
+│   └── note_example.jpg            # Input format example
 └── README.md
 ```
 
 ## Setup
 
+### Prerequisites
+
+- Python 3.10 or higher
+- A Gemini API key ([Google AI Studio](https://aistudio.google.com/apikey)) or an OpenAI API key
+
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/soungmoonie/ADR_detection.git
-cd ADR_detection
+git clone https://github.com/sungmoonie/multi-agent-ADR-detection.git
+cd multi-agent-ADR-detection
 ```
 
 ### 2. Create a virtual environment (recommended)
@@ -66,22 +70,31 @@ source venv/bin/activate        # macOS / Linux
 pip install -r requirements.txt
 ```
 
+This installs all required packages including `google-genai`, `openai`, `pandas`, `streamlit`, and others.
+
 ### 4. Set up your API key
 
-Create a `.env` file in the `dashboard/` directory:
+Copy the example file and fill in your key:
 
 ```bash
-cp dashboard/.env.example dashboard/.env
+cp .env.example .env
 ```
 
-Edit `dashboard/.env` and add your Gemini API key:
+Edit `.env`:
 
 ```
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-> You can obtain a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
-> If using OpenAI models, set `OPENAI_API_KEY` in the same `.env` file.
+> If using OpenAI models, add `OPENAI_API_KEY=your_openai_api_key_here` to the same file.
+
+For the dashboard, also set up its `.env`:
+
+```bash
+cp dashboard/.env.example dashboard/.env
+```
+
+Edit `dashboard/.env` with the same API key.
 
 ## Usage
 
@@ -98,6 +111,12 @@ python pipeline.py data.xlsx --style narrative --note-col text
 
 # With OpenAI instead of Gemini
 python pipeline.py data.xlsx --style narrative --note-col text --provider openai --model gpt-4o
+```
+
+**Quick test with sample data:**
+
+```bash
+python pipeline.py note_sample.xlsx --style shorthand --note-col note_preprocessed
 ```
 
 **Arguments:**
