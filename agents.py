@@ -86,22 +86,44 @@ class BaseAgent:
                 return response.text
 
         except Exception as e:
-            return f"Error occurred ({self.provider}): {str(e)}"
+            print(f"[LLM Error] {self.provider}/{self.model}: {e}")
+            raise
 
     def _call_and_parse_json(self, instruction, messages, temperature=0.0,
                              json_mode=True, gemini_json_mime=False,
-                             fallback=None):
-        """Call LLM, clean response, parse as JSON."""
-        raw = self._call_llm(instruction, messages, temperature,
-                             json_mode, gemini_json_mime)
-        cleaned = self._clean_json_string(raw)
-        try:
-            return json.loads(cleaned)
-        except json.JSONDecodeError:
-            if fallback is not None:
-                return fallback
-            print(f"JSON Parsing Failed. Raw: {raw}")
-            return fallback or {}
+                             fallback=None, max_retries=2):
+        """Call LLM, clean response, parse as JSON.
+        Retries on transient errors up to *max_retries* times.
+        """
+        import time as _time
+
+        last_err = None
+        for attempt in range(1 + max_retries):
+            try:
+                raw = self._call_llm(instruction, messages, temperature,
+                                     json_mode, gemini_json_mime)
+                cleaned = self._clean_json_string(raw)
+                try:
+                    return json.loads(cleaned)
+                except json.JSONDecodeError:
+                    if fallback is not None:
+                        print(f"[Warning] JSON parse failed (attempt {attempt+1}). "
+                              f"Using fallback. Raw snippet: {raw[:200]}")
+                        return fallback
+                    print(f"JSON Parsing Failed. Raw: {raw}")
+                    return fallback or {}
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries:
+                    wait = 2 ** attempt
+                    print(f"[Retry {attempt+1}/{max_retries}] LLM call failed: {e}. "
+                          f"Retrying in {wait}s...")
+                    _time.sleep(wait)
+                else:
+                    print(f"[Error] LLM call failed after {max_retries} retries: {e}")
+                    if fallback is not None:
+                        return fallback
+                    return fallback or {}
 
 
 # ============================================================================
@@ -520,10 +542,10 @@ class ConfoundersValidation_Agent(BaseAgent):
             "original_note_evidences": "[Direct verbatim quote or span from the Original Note]",
             "context_note_evidences": "[Relevant summary from the Context Note]",
             "reasoning": [
-                "Comparison of evidence between the Original Note and Context Note",
-                "Specific explanation of how the agent's reasoning aligns or conflicts with the evidence",
-                "Identify missed explicit cues in the note (explicit symptoms/AE keywords and explicit drug–symptom connectors). Prescription changes may be cited ONLY as supporting context after a symptom/AE is explicitly identified; do NOT create ADR candidates from prescription changes alone, and do NOT infer unstated reasons behind those changes."
-            ]
+            "Compare the evidence in the Original Note and the Context Note, and determine whether the confounder judgment is supported by the documented facts.",
+            "Explain specifically how the confounder agent’s reasoning aligns or conflicts with the note evidence. If the confounder reasoning is valid but does not fully negate the ADR candidate, explicitly state that both a valid confounder and an explicit drug–event cue coexist.",
+            "Identify any missed explicit cues in the note, including explicit symptoms/AE keywords and explicit drug–symptom connectors. Make clear whether these cues preserve ADR plausibility even when a confounder is present. Prescription changes may be cited ONLY as supporting context after a symptom/AE is explicitly identified; do NOT create ADR candidates from prescription changes alone, and do NOT infer unstated reasons behind those changes."
+        ]
             }}
         ]
         }}
@@ -591,10 +613,10 @@ class ConfoundersValidation_Agent(BaseAgent):
             "validation_verdict": "Correct / Incorrect",
             "original_note_evidences": "[Direct verbatim quote or continuous span from the Original Note]",
             "reasoning": [
-                "Compare the Original Note evidence against the confounder's judgment",
-                "Explain specifically how the agent's reasoning aligns or conflicts with the evidence",
-                "Identify missed explicit cues in the note (explicit symptoms/AE keywords and explicit drug–symptom connectors). Prescription changes may be cited ONLY as supporting context after a symptom/AE is explicitly identified; do NOT create ADR candidates from prescription changes alone, and do NOT infer unstated reasons behind those changes."
-            ]
+            "Compare the evidence in the Original Note and the Context Note, and determine whether the confounder judgment is supported by the documented facts.",
+            "Explain specifically how the confounder agent’s reasoning aligns or conflicts with the note evidence. If the confounder reasoning is valid but does not fully negate the ADR candidate, explicitly state that both a valid confounder and an explicit drug–event cue coexist.",
+            "Identify any missed explicit cues in the note, including explicit symptoms/AE keywords and explicit drug–symptom connectors. Make clear whether these cues preserve ADR plausibility even when a confounder is present. Prescription changes may be cited ONLY as supporting context after a symptom/AE is explicitly identified; do NOT create ADR candidates from prescription changes alone, and do NOT infer unstated reasons behind those changes."
+        ]
             }}
         ]
         }}

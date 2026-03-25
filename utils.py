@@ -50,11 +50,6 @@ def classify_certainty(x):
         if isinstance(parsed, list):
             return 1 if len(parsed) > 0 else 0
         elif isinstance(parsed, dict):
-            if "offers" in parsed:
-                val = parsed["offers"]
-                if isinstance(val, list):
-                    return 1 if len(val) > 0 else 0
-                return 0 if val == "No Side Effect" else 1
             return 1 if len(parsed) > 0 else 0
     except Exception:
         pass

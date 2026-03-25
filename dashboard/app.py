@@ -259,6 +259,14 @@ if "data_file" not in st.session_state:
     st.session_state["data_file"] = DEFAULT_FILE
 if "id_col" not in st.session_state:
     st.session_state["id_col"] = "id_note"
+if "_data_version" not in st.session_state:
+    st.session_state["_data_version"] = 0
+
+
+def _bump_data_version():
+    """Increment data version counter to invalidate all downstream caches."""
+    st.session_state["_data_version"] = st.session_state.get("_data_version", 0) + 1
+    load_data.clear()
 
 
 def _empty_dataframe():
@@ -396,7 +404,7 @@ def _run_pipeline(tmp_rel, log_path, search_dir, proc_env, style="shorthand"):
         try:
             with open(log_path, "w", encoding="utf-8") as _log_f:
                 _pipe_proc = subprocess.Popen(
-                    [sys.executable, _pipeline_script, _input_from_root,
+                    [sys.executable, "-u", _pipeline_script, _input_from_root,
                      "--style", style,
                      "--note-col", "note_preprocessed",
                      "--provider", "gemini"],
@@ -659,7 +667,7 @@ if page == "Data Upload":
                     st.session_state["id_col"]    = (
                         "__auto__" if selected_id == AUTO_LABEL else selected_id
                     )
-                    load_data.clear()
+                    _bump_data_version()
                     st.rerun()
             else:
                 run_ready = bool(file_cols and _effective_key and note_text_col)
@@ -707,7 +715,7 @@ if page == "Data Upload":
                             st.session_state["id_col"]    = (
                                 "__auto__" if selected_id == AUTO_LABEL else selected_id
                             )
-                            load_data.clear()
+                            _bump_data_version()
                             st.success(f"Results saved → **output/{_result_name}**  \n"
                                        f"Log saved → **output/{_log_name}**")
                             st.rerun()
@@ -819,7 +827,7 @@ if page == "Data Upload":
                 if _r["proc"].returncode == 0:
                     st.session_state["data_file"] = _result_rel_t
                     st.session_state["id_col"]    = "id"
-                    load_data.clear()
+                    _bump_data_version()
                     st.success(f"Results saved → **output/{_result_name_t}**  \n"
                                f"Log saved → **output/{_log_name}**")
                     st.rerun()
@@ -968,7 +976,7 @@ ADR determination with full, traceable reasoning.
         st.subheader("Top 10 Confirmed ADR Drugs")
 
         @st.cache_data
-        def _ov_top_drugs(_df, data_file=""):  # data_file key: invalidate cache on file change
+        def _ov_top_drugs(_df, data_file="", ver=0):
             cnts = Counter()
             for _, row in _df.iterrows():
                 abbr_map = {}
@@ -988,8 +996,9 @@ ADR determination with full, traceable reasoning.
             return cnts
 
         _cur_file = st.session_state.get("data_file", "")
+        _ver = st.session_state.get("_data_version", 0)
         top_drugs_ov = _ov_top_drugs(df[df["validation_side_effect_binary"] == 1],
-                                      data_file=_cur_file)
+                                      data_file=_cur_file, ver=_ver)
         top10_d = pd.DataFrame(top_drugs_ov.most_common(10), columns=["Drug", "Count"])
         fig_td = px.bar(top10_d, x="Count", y="Drug", orientation="h",
                         color="Count", color_continuous_scale="Blues")
@@ -1001,7 +1010,7 @@ ADR determination with full, traceable reasoning.
     st.subheader("Top 10 Confirmed Drug → Symptom Pairs")
 
     @st.cache_data
-    def _ov_top_pairs(_df, data_file=""):  # data_file key: invalidate cache on file change
+    def _ov_top_pairs(_df, data_file="", ver=0):
         cnts = Counter()
         canonical = {}
         for _, row in _df.iterrows():
@@ -1031,7 +1040,8 @@ ADR determination with full, traceable reasoning.
         return cnts
 
     top_pairs_ov = _ov_top_pairs(df[df["validation_side_effect_binary"] == 1],
-                                  data_file=st.session_state.get("data_file", ""))
+                                  data_file=st.session_state.get("data_file", ""),
+                                  ver=st.session_state.get("_data_version", 0))
     top10_p = pd.DataFrame(top_pairs_ov.most_common(10), columns=["Pair", "Count"])
     fig_tp = px.bar(top10_p, x="Count", y="Pair", orientation="h",
                     color="Count", color_continuous_scale="Blues")
@@ -1222,10 +1232,10 @@ elif page == "Note Browser":
                             summary = cv_q.get("confounder_judgment_summary", "")
                             if summary:
                                 st.markdown(f"**Summary:**  \n{summary}")
-                            orig_ev = cv_q.get("original_note_evidences", "")
                             ctx_ev  = cv_q.get("context_note_evidences", "")
-                            if orig_ev and orig_ev != "N/A":
-                                st.markdown(f"**Note Evidence:** `{orig_ev}`")
+                            if text:
+                                st.markdown("**Note Evidence:**")
+                                st.code(text, language="")
                             if ctx_ev and ctx_ev != "N/A":
                                 st.markdown(f"**Contextual Evidence:**  \n{ctx_ev}")
                             reasons = cv_q.get("reasoning", [])
@@ -1255,7 +1265,8 @@ elif page == "Note Browser":
 
                     with st.expander(f"{drug}  →  {symptom}"):
                         if raw_text:
-                            st.markdown(f"**Source Text:** `{raw_text}`")
+                            st.markdown("**Source Text:**")
+                            st.code(raw_text, language="")
                         st.markdown(f"**Confirmation Rationale:**  \n{explanation}")
             else:
                 result_str = val_data.get("result", "No Side Effect")
@@ -1271,7 +1282,7 @@ elif page == "Drug & ADR Analysis":
     st.title("Drug & ADR Analysis")
 
     @st.cache_data
-    def build_drug_detail_index(_df, data_file=""):
+    def build_drug_detail_index(_df, data_file="", ver=0):
         """Per-drug lookup: ADR candidates & confirmed ADRs across all notes."""
         candidates = {}   # norm_drug → [{"Note ID", "Symptom", "Confounder", "Validation", "Source Text"}]
         confirmed  = {}   # norm_drug → [{"Note ID", "Symptom", "Source Text", "Explanation"}]
@@ -1338,7 +1349,7 @@ elif page == "Drug & ADR Analysis":
         return candidates, confirmed
 
     @st.cache_data
-    def get_med_counts(_df, data_file=""):  # data_file key: invalidate cache on file change
+    def get_med_counts(_df, data_file="", ver=0):
         all_meds = []
         for parsed in _df["_medications_parsed"]:
             for m in parsed.get("medications", []):
@@ -1350,7 +1361,7 @@ elif page == "Drug & ADR Analysis":
         return Counter(all_meds)
 
     @st.cache_data
-    def get_adr_counts(_df, data_file=""):  # data_file key: invalidate cache on file change
+    def get_adr_counts(_df, data_file="", ver=0):
         pairs      = []
         drug_cnts  = Counter()
         sym_cnts   = Counter()
@@ -1378,7 +1389,7 @@ elif page == "Drug & ADR Analysis":
         return drug_cnts, sym_cnts, Counter(pairs)
 
     @st.cache_data
-    def get_validated_adr_counts(_df, data_file=""):  # data_file key: invalidate cache on file change
+    def get_validated_adr_counts(_df, data_file="", ver=0):
         drug_cnts     = Counter()
         sym_cnts      = Counter()
         pairs         = []
@@ -1420,10 +1431,11 @@ elif page == "Drug & ADR Analysis":
         return drug_cnts, sym_cnts, Counter(pairs)
 
     _cur_file = st.session_state.get("data_file", "")
-    med_counts                           = get_med_counts(df, data_file=_cur_file)
-    drug_counts, sym_counts, pair_cnts   = get_adr_counts(df, data_file=_cur_file)
+    _ver = st.session_state.get("_data_version", 0)
+    med_counts                           = get_med_counts(df, data_file=_cur_file, ver=_ver)
+    drug_counts, sym_counts, pair_cnts   = get_adr_counts(df, data_file=_cur_file, ver=_ver)
     val_drug_cnts, val_sym_cnts, val_pair_cnts = get_validated_adr_counts(
-        df[df["validation_side_effect_binary"] == 1], data_file=_cur_file
+        df[df["validation_side_effect_binary"] == 1], data_file=_cur_file, ver=_ver
     )
 
     # ── Top N control: slider + number input (bidirectional sync) ────────────
@@ -1537,7 +1549,7 @@ elif page == "Drug & ADR Analysis":
         "and confirmed ADRs associated with it across every note."
     )
 
-    _cand_idx, _conf_idx = build_drug_detail_index(df, data_file=_cur_file)
+    _cand_idx, _conf_idx = build_drug_detail_index(df, data_file=_cur_file, ver=_ver)
 
     # Drug list sorted by candidate count (most suspicious drugs first)
     _all_drugs = sorted(
