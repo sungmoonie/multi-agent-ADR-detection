@@ -39,6 +39,8 @@ multi-agent-ADR-detection/
 │   ├── note_sample.xlsx            # Sample input file
 │   ├── Multi-Agent_Framework.png   # Framework diagram
 │   └── note_example.jpg            # Input format example
+├── docs/
+│   └── screenshots/    # Web interface screenshots
 └── README.md
 ```
 
@@ -152,6 +154,45 @@ The dashboard provides:
 - **Overview**: ADR distribution charts and top drug–symptom pairs
 - **Note Browser**: Drill into individual notes with full reasoning trace
 - **Drug & ADR Analysis**: Explore ADR profiles per drug across all notes
+
+<p align="center">
+  <img src="docs/screenshots/interface_overview.png" width="800"/>
+  <br><em>Dataset-level overview — final label distribution, top confirmed ADR drugs, and frequent drug–symptom pairs</em>
+</p>
+
+<details>
+<summary><b>More screenshots</b> (click to expand)</summary>
+<br>
+
+#### Data Upload
+<p align="center">
+  <img src="docs/screenshots/interface_upload.png" width="800"/>
+</p>
+
+Upload CSV/XLSX files containing multiple clinical notes or paste a single note as free text. Select note format, choose input columns, and execute the ADR detection pipeline.
+
+#### Note Browser — Reasoning Process
+<p align="center">
+  <img src="docs/screenshots/interface_reasoning.png" width="800"/>
+</p>
+
+Inspect intermediate outputs for each note: ADR candidate extraction, confounder judgment, confounder validation with note-grounded evidence, and final adjudication. This view enables transparent review of how each ADR decision was derived.
+
+#### Drug & ADR Analysis
+<p align="center">
+  <img src="docs/screenshots/interface_analysis.png" width="800"/>
+</p>
+
+Explore the frequency distribution of confirmed ADR symptoms and drug–symptom pairs across all uploaded notes with interactive controls.
+
+#### Drug Detail View
+<p align="center">
+  <img src="docs/screenshots/interface_drug_detail.png" width="800"/>
+</p>
+
+Select a normalized drug name to review all associated ADR candidates and confirmed ADRs across notes, including note identifiers, symptoms, validation outcomes, and supporting source text.
+
+</details>
 
 <p align="center">
   <img src="dashboard/note_example.jpg" width="600"/>
