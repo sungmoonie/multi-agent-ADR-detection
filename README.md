@@ -161,7 +161,7 @@ The dashboard provides:
 </p>
 
 <details>
-<summary><b>More screenshots</b> (click to expand)</summary>
+<summary><b>View all dashboard pages</b> (click to expand)</summary>
 <br>
 
 #### Data Upload
@@ -194,14 +194,14 @@ Select a normalized drug name to review all associated ADR candidates and confir
 
 </details>
 
+## Input Format
+
+Your input Excel file needs at minimum **one column containing clinical note text**. You specify which column to use via `--note-col` (CLI) or the column selector (dashboard).
+
 <p align="center">
   <img src="dashboard/note_example.jpg" width="600"/>
   <br><em>Example input format</em>
 </p>
-
-## Input Format
-
-Your input Excel file needs at minimum **one column containing clinical note text**. You specify which column to use via `--note-col` (CLI) or the column selector (dashboard).
 
 | Column | Required | Description |
 |--------|----------|-------------|
